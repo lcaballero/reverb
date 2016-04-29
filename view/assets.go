@@ -10,6 +10,7 @@ import (
 
 	. "github.com/lcaballero/gel"
 	"github.com/labstack/echo"
+	"net/http"
 )
 
 // StaticAsset represents file based assets like js and css.
@@ -86,7 +87,19 @@ func (resolve PathResolver) ToHandler() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		kind := c.Param("kind")
 		file := c.Param("file")
+		hash := c.Param("hash")
 		asset := resolve(kind, file)
+		res := c.Response()
+		headers := res.Header()
+		headers.Add("Cache-Control", "max-age=31536000")
+		headers.Add("ETag", hash)
+
+		match := c.Request().Header().Get("If-None-Match")
+		fmt.Printf("match: %s\n", match)
+
+		if match == hash {
+			return c.HTML(http.StatusNotModified, "")
+		}
 		return c.File(asset)
 	}
 }
@@ -110,4 +123,10 @@ func RootResolver(root string) PathResolver {
 		return filepath.Join(path...)
 	}
 	return resolver;
+}
+
+func (p PathResolver) ServeFile(c echo.Context) error {
+	file := c.Param("file")
+	img := p(file)
+	return c.File(img)
 }
